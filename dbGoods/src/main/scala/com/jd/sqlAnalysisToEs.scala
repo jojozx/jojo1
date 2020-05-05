@@ -2,11 +2,12 @@ package com.jd
 
 import java.sql.{Connection, DriverManager, PreparedStatement}
 
+import com.mysql.cj.protocol.Resultset
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
 import org.apache.flink.streaming.api.scala._
 
-case class  dbGoods(goodId:Integer,cat_id:Int,goods_sn:String,
+case class  DbGoods(goodId:Integer,catId:Int,goodsSn:String,
                     newGoodsSn:String ,goodsName:String,BrandId:String,
                     goodsNumber:String,goodsWeight:String,goorsBrief:String,
                     goodsThumb:String,goodsImg:String,addTime :Int,
@@ -33,7 +34,7 @@ object sqlAnalysisToEs {
 
 
 }
-class MyJdbcsink() extends RichSourceFunction[dbGoods]{
+class MyJdbcsink() extends RichSourceFunction[DbGoods]{
   var conn: Connection = _
   var select: PreparedStatement = _
   var updateStmt: PreparedStatement = _
@@ -41,20 +42,56 @@ class MyJdbcsink() extends RichSourceFunction[dbGoods]{
 
   override def open(parameters: Configuration): Unit = {
     super.open(parameters)
-    conn=DriverManager.getConnection("jdbc:mysql://172.28.48.96:80/test",
+    conn=DriverManager.getConnection("jdbc:mysql://172.28.48.96:80/autoparts",
     "canal",
     "tk7U3pGhK")
     conn.prepareStatement("select * from db_goods")
   }
 
 
-  override def run(sourceContext: SourceFunction.SourceContext[dbGoods]): Unit = {
+  override def run(sourceContext: SourceFunction.SourceContext[DbGoods]): Unit = {
 
   }
 
   override def cancel(): Unit = ???
 
   override def close(): Unit = {
-    insertStmt.close()
+    select.close()
   }
+}
+class MyJdbcSource extends RichSourceFunction[DbGoods]{
+  var connection: Connection = _
+  var ps: PreparedStatement = _
+
+  val userName="canal"
+  val password="tk7U3pGhK"
+  val url="jdbc:mysql://172.28.48.96:80/autoparts"
+  val driver = "com.mysql.jdbc.Driver"
+  val sql="select * from db_goods"
+
+  @throws(classOf[Exception])
+  override def open(parameters: Configuration) : Unit = {
+    super.open(parameters)
+    Class.forName(driver)
+
+      connection = DriverManager.getConnection(url)
+      ps = connection.prepareStatement(sql)
+
+  }
+  @throws(classOf[Exception])
+  override def run(sourceContext: SourceFunction.SourceContext[DbGoods]): Unit = {
+    var resultset:Resultset=ps.executeQuery()
+    while(resultset.next()){
+     var dbGoods :DbGoods=new DbGoods(resultset.getString("goods_id"),
+       resultset.getString("cat_id"),resultset.getString("goods_sn"),
+       resultset.getString("goods_sn"),resultset.getString("goods_sn"),
+       resultset.getString("goods_sn"),resultset.getString("goods_sn"),
+       resultset.getString("goods_sn"),resultset.getString("goods_sn")
+     )
+
+    }
+
+  }
+
+  override def cancel(): Unit = ???
 }
