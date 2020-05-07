@@ -2,15 +2,19 @@ package com.jd
 
 import java.sql.{Connection, DriverManager, PreparedStatement}
 
-import com.mysql.cj.protocol.Resultset
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.windowing.time.Time
+import org.apache.flink.table.api.{Table, TableEnvironment}
+import org.apache.flink.table.api.scala.StreamTableEnvironment
+
 
 case class  DbGoods(goodId:Integer,catId:Int,goodsSn:String,
                     newGoodsSn:String ,goodsName:String,BrandId:String,
                     goodsNumber:String,goodsWeight:String,goorsBrief:String,
-                    goodsThumb:String,goodsImg:String,addTime :Int,
+                    goodsThumb:String,goodsImg:String,addTime :Long,
                     isdelete:Int, goodsFormat:String,barcode:String,
                     packageFormat:String,factoryCode:String,minpackage:String,
                     productCompany:String,measureunit:String,conversionValue:String
@@ -27,7 +31,15 @@ object sqlAnalysisToEs {
   def main(args: Array[String]): Unit = {
     val env=StreamExecutionEnvironment.getExecutionEnvironment
 
-    env.addSource(new MyJdbcsink())
+   val data = env.addSource(new MyJdbcsink())
+    data.assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor[DbGoods](Time.seconds(0L)) {
+      override def extractTimestamp(element: DbGoods): Long = {
+        element.addTime
+      }
+    }).setParallelism(1)
+    val tableEnv: StreamTableEnvironment = TableEnvironment.getTableEnvironment(env)
+    val ecommerceLogTable = tableEnv.fromDataStream(data)
+    val table:Table =ecommerceLogTable.select("das,asd").filter("as=11")
 
 
   }
@@ -58,40 +70,7 @@ class MyJdbcsink() extends RichSourceFunction[DbGoods]{
   override def close(): Unit = {
     select.close()
   }
-}
-class MyJdbcSource extends RichSourceFunction[DbGoods]{
-  var connection: Connection = _
-  var ps: PreparedStatement = _
 
-  val userName="canal"
-  val password="tk7U3pGhK"
-  val url="jdbc:mysql://172.28.48.96:80/autoparts"
-  val driver = "com.mysql.jdbc.Driver"
-  val sql="select * from db_goods"
 
-  @throws(classOf[Exception])
-  override def open(parameters: Configuration) : Unit = {
-    super.open(parameters)
-    Class.forName(driver)
 
-      connection = DriverManager.getConnection(url)
-      ps = connection.prepareStatement(sql)
-
-  }
-  @throws(classOf[Exception])
-  override def run(sourceContext: SourceFunction.SourceContext[DbGoods]): Unit = {
-    var resultset:Resultset=ps.executeQuery()
-    while(resultset.next()){
-     var dbGoods :DbGoods=new DbGoods(resultset.getString("goods_id"),
-       resultset.getString("cat_id"),resultset.getString("goods_sn"),
-       resultset.getString("goods_sn"),resultset.getString("goods_sn"),
-       resultset.getString("goods_sn"),resultset.getString("goods_sn"),
-       resultset.getString("goods_sn"),resultset.getString("goods_sn")
-     )
-
-    }
-
-  }
-
-  override def cancel(): Unit = ???
 }
